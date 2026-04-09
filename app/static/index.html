@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AI Music Practice MVP</title>
+    <style>
+      :root {
+        --bg: #f7f1e7;
+        --panel: #fffaf2;
+        --ink: #1d232f;
+        --accent: #bf5b04;
+        --accent-dark: #803b00;
+        --line: #d9c5ab;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: Georgia, "Times New Roman", serif;
+        background:
+          radial-gradient(circle at top left, rgba(191, 91, 4, 0.12), transparent 32%),
+          linear-gradient(180deg, #f7f1e7 0%, #efe4d2 100%);
+        color: var(--ink);
+      }
+
+      main {
+        max-width: 960px;
+        margin: 0 auto;
+        padding: 48px 20px 80px;
+      }
+
+      h1 {
+        margin-bottom: 8px;
+        font-size: clamp(2.1rem, 5vw, 4rem);
+        line-height: 0.95;
+      }
+
+      p.lead {
+        max-width: 760px;
+        font-size: 1.05rem;
+      }
+
+      form, .panel {
+        background: rgba(255, 250, 242, 0.88);
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        padding: 20px;
+        box-shadow: 0 18px 50px rgba(80, 44, 11, 0.08);
+        backdrop-filter: blur(8px);
+      }
+
+      form {
+        display: grid;
+        gap: 14px;
+        margin-top: 26px;
+      }
+
+      label {
+        font-weight: 700;
+      }
+
+      input, textarea, button {
+        width: 100%;
+        font: inherit;
+        padding: 12px 14px;
+        border-radius: 12px;
+        border: 1px solid var(--line);
+      }
+
+      button {
+        cursor: pointer;
+        border: none;
+        background: linear-gradient(135deg, var(--accent), var(--accent-dark));
+        color: white;
+        font-weight: 700;
+      }
+
+      .button-row {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 12px;
+      }
+
+      .checkbox-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+        gap: 10px;
+      }
+
+      .checkbox-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 12px;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: white;
+      }
+
+      .checkbox-item input {
+        width: auto;
+        margin: 0;
+      }
+
+      .hint {
+        margin: 0;
+        color: #6a5a4c;
+        font-size: 0.95rem;
+      }
+
+      #status, #results {
+        margin-top: 20px;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 14px;
+      }
+
+      .metric {
+        padding: 16px;
+        border-radius: 14px;
+        background: white;
+        border: 1px solid var(--line);
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 14px;
+      }
+
+      th, td {
+        text-align: left;
+        padding: 10px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .pill {
+        display: inline-block;
+        margin: 4px 6px 0 0;
+        padding: 8px 12px;
+        background: #f1ddc4;
+        border-radius: 999px;
+      }
+
+      .hidden {
+        display: none;
+      }
+
+      .warning {
+        color: #8e3300;
+      }
+
+      .chart-shell {
+        margin-top: 14px;
+        padding: 18px;
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        background:
+          linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(250, 241, 226, 0.96));
+      }
+
+      .chart-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+        gap: 16px 14px;
+      }
+
+      .chart-bar {
+        min-height: 76px;
+        padding: 10px 12px;
+        border-left: 4px solid var(--ink);
+        border-right: 1px solid rgba(29, 35, 47, 0.22);
+        background: rgba(255, 255, 255, 0.72);
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+      }
+
+      .chart-bar strong {
+        font-size: 0.8rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: #6a5a4c;
+      }
+
+      .chart-chords {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px 16px;
+        align-items: center;
+        font-size: 1.6rem;
+        font-weight: 700;
+      }
+
+      .chart-repeat {
+        margin-top: 14px;
+        color: #6a5a4c;
+        font-style: italic;
+      }
+
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>AI Music Practice MVP</h1>
+      <p class="lead">
+        Run lightweight song analysis when you only need theory, or generate a backing track separately when you want to practice over the song.
+      </p>
+
+      <form id="job-form">
+        <div>
+          <label for="youtube_url">YouTube URL</label>
+          <input
+            id="youtube_url"
+            name="youtube_url"
+            type="url"
+            placeholder="https://www.youtube.com/watch?v=..."
+            required
+          />
+        </div>
+
+        <div>
+          <label>Backing-track stem suppression</label>
+          <div class="checkbox-grid">
+            <label class="checkbox-item"><input type="checkbox" name="suppress" value="guitar" checked /> guitar</label>
+            <label class="checkbox-item"><input type="checkbox" name="suppress" value="vocals" /> vocals</label>
+            <label class="checkbox-item"><input type="checkbox" name="suppress" value="bass" /> bass</label>
+            <label class="checkbox-item"><input type="checkbox" name="suppress" value="drums" /> drums</label>
+          </div>
+          <p class="hint">Pick up to two stems. Backing-track generation is the heavier job.</p>
+        </div>
+
+        <div class="button-row">
+          <button type="button" data-mode="analysis">Analyze Song</button>
+          <button type="button" data-mode="backing_track">Create Backing Track</button>
+        </div>
+      </form>
+
+      <div id="status" class="panel hidden"></div>
+      <section id="results" class="panel hidden"></section>
+    </main>
+
+    <script>
+      const statusBox = document.getElementById("status");
+      const resultsBox = document.getElementById("results");
+      const resultState = {
+        analysis: null,
+        backing_track: null,
+      };
+      const buttons = document.querySelectorAll("button[data-mode]");
+
+      buttons.forEach((button) => {
+        button.addEventListener("click", async () => {
+          const mode = button.dataset.mode;
+          const selected = Array.from(document.querySelectorAll("input[name='suppress']:checked"))
+            .map((input) => input.value);
+
+          if (selected.length > 2) {
+            statusBox.classList.remove("hidden");
+            statusBox.textContent = "Choose at most two stems to suppress.";
+            return;
+          }
+
+          const payload = {
+            youtube_url: document.getElementById("youtube_url").value,
+            job_mode: mode,
+            instruments_to_suppress: selected,
+          };
+
+          statusBox.classList.remove("hidden");
+          statusBox.textContent =
+            mode === "analysis" ? "Starting analysis job..." : "Starting backing-track job...";
+
+          const response = await fetch("/api/jobs", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+
+          if (!response.ok) {
+            const errorPayload = await response.json().catch(() => ({}));
+            statusBox.textContent = errorPayload.detail || "Failed to create job.";
+            return;
+          }
+
+          const job = await response.json();
+          pollJob(job.job_id, mode);
+        });
+      });
+
+      async function pollJob(jobId, mode) {
+        while (true) {
+          const response = await fetch(`/api/jobs/${jobId}`);
+          const job = await response.json();
+          statusBox.textContent = `Job status: ${job.status}`;
+
+          if (job.status === "completed") {
+            resultState[mode] = job.result;
+            renderResults();
+            return;
+          }
+
+          if (job.status === "failed") {
+            statusBox.textContent = `Job failed: ${job.error}`;
+            return;
+          }
+
+          await new Promise((resolve) => setTimeout(resolve, mode === "backing_track" ? 2500 : 1500));
+        }
+      }
+
+      function renderResults() {
+        const analysisResult = resultState.analysis;
+        const backingResult = resultState.backing_track;
+        if (!analysisResult && !backingResult) {
+          resultsBox.classList.add("hidden");
+          return;
+        }
+
+        statusBox.textContent = analysisResult && backingResult
+          ? "Analysis and backing track are ready."
+          : analysisResult
+            ? "Analysis complete."
+            : "Backing track complete.";
+        resultsBox.classList.remove("hidden");
+        const title = analysisResult?.source_title || backingResult?.source_title || "Song";
+        resultsBox.innerHTML = `
+          <h2>${title}</h2>
+          ${analysisResult ? renderAnalysisBlock(analysisResult) : ""}
+          ${backingResult ? renderBackingBlock(backingResult) : ""}
+        `;
+      }
+
+      function renderAnalysisBlock(result) {
+        const progression = (result.progression_summary || [])
+          .map((chord) => `<span class="pill">${chord}</span>`)
+          .join("");
+        const chartMarkup = renderChordChart(result.chart_bars || [], result.time_signature || "4/4");
+        const notes = (result.theory_notes || [])
+          .map((note) => `<p>${note}</p>`)
+          .join("");
+        const warnings = (result.warnings || [])
+          .map((warning) => `<p class="warning">${warning}</p>`)
+          .join("");
+
+        return `
+          <h3>Song Analysis</h3>
+          <div class="grid">
+            <div class="metric">
+              <strong>BPM</strong>
+              <div>${result.bpm.toFixed(1)}</div>
+              <small>confidence ${(result.bpm_confidence * 100).toFixed(0)}%</small>
+            </div>
+            <div class="metric">
+              <strong>Time Signature</strong>
+              <div>${result.time_signature || "4/4"}</div>
+            </div>
+            <div class="metric">
+              <strong>Key</strong>
+              <div>${result.key}</div>
+              <small>confidence ${(result.key_confidence * 100).toFixed(0)}%</small>
+            </div>
+            <div class="metric">
+              <strong>Tuning</strong>
+              <div>${result.tuning_suggestion || "Unavailable"}</div>
+              <small>${result.tuning_confidence ? `confidence ${(result.tuning_confidence * 100).toFixed(0)}%` : ""}</small>
+            </div>
+            <div class="metric">
+              <strong>Capo</strong>
+              <div>${result.capo_suggestion || "No capo suggestion available."}</div>
+            </div>
+          </div>
+          <h3>Progression Summary</h3>
+          <div>${progression || "<span class='pill'>No stable progression detected</span>"}</div>
+          <h3>Theory Check</h3>
+          ${notes || "<p>No theory notes available.</p>"}
+          <h3>Chord Chart</h3>
+          ${chartMarkup}
+          ${warnings}
+        `;
+      }
+
+      function renderBackingBlock(result) {
+        const warnings = (result.warnings || [])
+          .map((warning) => `<p class="warning">${warning}</p>`)
+          .join("");
+        const suppressed = (result.suppressed_instruments || []).length
+          ? `<p>Suppressed stems: ${(result.suppressed_instruments || []).join(", ")}</p>`
+          : "";
+        return `
+          <h3>Backing Track</h3>
+          <div class="grid">
+            <div class="metric">
+              <strong>Backing Track</strong>
+              <div>${result.backing_track_confidence ? `${(result.backing_track_confidence * 100).toFixed(0)}% confidence` : "Unavailable"}</div>
+              <small>${(result.suppressed_instruments || []).join(", ") || "No stems suppressed"}</small>
+            </div>
+          </div>
+          ${result.backing_track_url ? `<p><a href="${result.backing_track_url}">Download backing track</a></p>` : "<p>No backing track was produced for this request.</p>"}
+          ${suppressed}
+          ${warnings}
+        `;
+      }
+
+      function renderChordChart(chartBars, timeSignature) {
+        if (!chartBars.length) {
+          return "<p>No stable progression detected.</p>";
+        }
+        const rows = chartBars
+          .map((bar, index) => `
+            <div class="chart-bar">
+              <strong>Bar ${index + 1}</strong>
+              <div class="chart-chords">
+                ${bar.map((chord) => `<span>${chord}</span>`).join("")}
+              </div>
+            </div>
+          `)
+          .join("");
+
+        const repeatHint = `<p class='chart-repeat'>Approximate bar chart in ${timeSignature}. Generated from detected chord spans, so use it as a practice chart rather than engraved notation.</p>`;
+
+        return `
+          <div class="chart-shell">
+            <div class="chart-grid">${rows}</div>
+            ${repeatHint}
+          </div>
+        `;
+      }
+    </script>
+  </body>
+  </html>
