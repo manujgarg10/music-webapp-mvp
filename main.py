@@ -46,3 +46,30 @@ def get_artifact(job_id: str, filename: str) -> FileResponse:
     if file_path.parent != RENDERED_DIR or not file_path.exists():
         raise HTTPException(status_code=404, detail="Artifact not found.")
     return FileResponse(file_path, filename=filename)
+
+
+import time
+
+@app.post("/analyze-song-simple")
+def analyze_song_simple(payload: CreateJobRequest):
+    # Step 1: Create job
+    job = job_store.create(payload)
+    job_store.start_background_run(job.job_id)
+
+    # Step 2: Wait for completion (blocking)
+    timeout = 60  # seconds
+    start_time = time.time()
+
+    while True:
+        current_job = job_store.get(job.job_id)
+
+        if current_job.status == "completed":
+            return current_job.result
+
+        if current_job.status == "failed":
+            raise HTTPException(status_code=500, detail=current_job.error)
+
+        if time.time() - start_time > timeout:
+            raise HTTPException(status_code=504, detail="Timeout waiting for analysis")
+
+        time.sleep(1)

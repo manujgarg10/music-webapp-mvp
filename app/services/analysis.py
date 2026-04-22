@@ -15,6 +15,27 @@ PITCH_CLASSES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"
 MAJOR_TEMPLATE = np.array([6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88])
 MINOR_TEMPLATE = np.array([6.33, 2.68, 3.52, 5.38, 2.6, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17])
 
+def clean_progression(chords: list[str]) -> list[str]:
+    if not chords:
+        return []
+
+    cleaned = []
+
+    # 1. Remove immediate duplicates
+    for chord in chords:
+        if not cleaned or chord != cleaned[-1]:
+            cleaned.append(chord)
+
+    # 2. Remove flicker (A → B → A)
+    smoothed = []
+    for i in range(len(cleaned)):
+        if 0 < i < len(cleaned) - 1:
+            if cleaned[i - 1] == cleaned[i + 1]:
+                continue
+        smoothed.append(cleaned[i])
+
+    # 3. Keep it short/readable
+    return smoothed[:12]
 
 @dataclass
 class AudioAnalysis:
@@ -47,9 +68,19 @@ def analyze(audio_path: Path) -> AudioAnalysis:
     bpm, bpm_confidence = detect_bpm(audio, sample_rate)
     time_signature = detect_time_signature(audio, sample_rate, bpm)
     chords = detect_chords(audio, sample_rate)
-    raw_progression_summary = summarize_progression(chords)
-    repeating_cycle = detect_repeating_cycle(raw_progression_summary)
-    progression_summary = repeating_cycle or raw_progression_summary
+    raw_progression = summarize_progression(chords)
+
+    # Step 1: compress aggressively
+    compressed = compress_chords(raw_progression)
+
+    # Step 2: remove weak first chord noise (B before Bm)
+    if len(compressed) > 1:
+        if compressed[0].rstrip("m") == compressed[1].rstrip("m"):
+            compressed = compressed[1:]
+
+    # Step 3: HARD LIMIT to first 8 meaningful chords
+    progression_summary = compressed[:8]
+
     chart_bars = build_chord_chart_bars(chords, progression_summary, bpm, time_signature, len(audio) / sample_rate)
     key, key_confidence, theory_notes = detect_key(audio, sample_rate, chords, progression_summary)
     tuning_suggestion, tuning_confidence = suggest_tuning(chords, progression_summary, key)
@@ -211,6 +242,83 @@ def summarize_progression(chords: list[ChordSpan]) -> list[str]:
             summary.append(chord.chord)
     return summary[:16]
 
+def compress_chords(chords: list[str]) -> list[str]:
+    """Collapse consecutive duplicates (stronger version)"""
+    if not chords:
+        return []
+
+    result = [chords[0]]
+
+    for chord in chords[1:]:
+        if chord != result[-1]:
+            result.append(chord)
+
+    return result
+
+def clean_progression(chords: list[str]) -> list[str]:
+    if not chords:
+        return []
+
+    # 1. Remove immediate duplicates
+    deduped = []
+    for chord in chords:
+        if not deduped or chord != deduped[-1]:
+            deduped.append(chord)
+
+    # 2. Normalize major/minor flicker (B vs Bm → Bm)
+    normalized = []
+    for chord in deduped:
+        if normalized:
+            prev = normalized[-1]
+            if chord.rstrip("m") == prev.rstrip("m"):
+                chord = chord.rstrip("m") + "m"
+        normalized.append(chord)
+
+    # 3. Collapse long repeats (Bm Bm Bm → Bm)
+    collapsed = []
+    for chord in normalized:
+        if not collapsed or chord != collapsed[-1]:
+            collapsed.append(chord)
+
+    # 4. Remove weak starting noise (like stray B before Bm)
+    if len(collapsed) >= 2:
+        first, second = collapsed[0], collapsed[1]
+        if first.rstrip("m") == second.rstrip("m"):
+            collapsed = collapsed[1:]
+
+    return collapsed[:8]
+
+def extract_core_loop(chords: list[str]) -> list[str]:
+    if len(chords) < 4:
+        return chords
+
+    best_pattern = chords
+    best_score = 0
+
+    # Try loop sizes from 3 to 6 (IMPORTANT: skip size=2)
+    for size in range(3, 7):
+        pattern = chords[:size]
+
+        matches = 0
+        total = 0
+
+        for i in range(0, len(chords) - size, size):
+            segment = chords[i:i+size]
+            if segment == pattern:
+                matches += 1
+            total += 1
+
+        if total > 0:
+            score = matches / total
+
+            # Prefer longer patterns slightly
+            score += size * 0.05
+
+            if score > best_score:
+                best_score = score
+                best_pattern = pattern
+
+    return best_pattern
 
 def build_chord_chart_bars(
     chords: list[ChordSpan],
